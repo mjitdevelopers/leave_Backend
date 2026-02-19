@@ -121,13 +121,13 @@ app.post("/api/attendance/checkin", async (req, res) => {
     );
 
     // 🔒 100 meters allowed
-    if (distance > 100) {
+    if (distance > 200) {
       return res.status(400).json({
         message: "You are not at Office Location",
       });
     }
 
-    const today = new Date().toLocaleDateString();
+    const today = new Date().toISOString().split("T")[0];
 
     const existing = await Attendance.findOne({
       user: user._id,
@@ -185,7 +185,7 @@ app.post("/api/attendance/checkout", async (req, res) => {
 
     const user = await User.findById(decoded.id);
 
-    const today = new Date().toLocaleDateString();
+    const today = new Date().toISOString().split("T")[0];
 
     const attendance = await Attendance.findOne({
       user: user._id,
@@ -232,15 +232,72 @@ app.get("/api/attendance", async (req, res) => {
     const admin = await User.findById(decoded.id);
 
     if (!admin || admin.role !== "ADMIN") {
-      return res.status(403).json({
-        message: "Access Denied",
-      });
+      return res.status(403).json({ message: "Access Denied" });
     }
 
-    const data = await Attendance.find().populate("user", "name email role");
+    // ✅ DATE FROM QUERY
+    const { date } = req.query;
+    const selectedDate = date || new Date().toISOString().split("T")[0];
 
-    res.json(data);
+    // 🔥 GET ALL USERS
+    const allUsers = await User.find({ role: { $ne: "ADMIN" } });
+
+    // 🔥 GET ATTENDANCE OF SELECTED DATE
+    const records = await Attendance.find({ date: selectedDate }).populate(
+      "user",
+      "name email role",
+    );
+
+    // 🔥 MAP USER-WISE ATTENDANCE
+    const finalData = allUsers.map((user) => {
+      const userAttendance = records.find(
+        (r) => r.user._id.toString() === user._id.toString(),
+      );
+
+      // 🔹 If attendance exists
+      if (userAttendance) {
+        let workingHours = "In Progress";
+
+        if (userAttendance.checkIn && userAttendance.checkOut) {
+          const start = new Date(`1970-01-01T${userAttendance.checkIn}`);
+          const end = new Date(`1970-01-01T${userAttendance.checkOut}`);
+
+          const diffMs = end - start;
+          const diffHrs = diffMs / (1000 * 60 * 60);
+
+          workingHours = diffHrs.toFixed(2);
+        }
+
+        return {
+          user: user,
+          date: selectedDate,
+          status: userAttendance.status,
+          checkIn: userAttendance.checkIn,
+          checkOut: userAttendance.checkOut,
+          workingHours: workingHours,
+        };
+      }
+
+      // 🔹 If NO attendance → ABSENT
+      return {
+        user: user,
+        date: selectedDate,
+        status: "Absent",
+        checkIn: null,
+        checkOut: null,
+        workingHours: "0.00",
+      };
+    });
+
+    res.json(finalData);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
+});
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

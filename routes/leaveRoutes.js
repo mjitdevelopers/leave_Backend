@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const Leave = require("../models/Leave");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 
 // 🔐 TOKEN VERIFY FUNCTION
 const verifyToken = async (req) => {
@@ -63,7 +64,7 @@ router.get("/my", async (req, res) => {
   }
 });
 
-// ================= ADMIN: ALL LEAVES =================
+// ================= ADMIN: ALL LEAVES (DATE FILTER FIXED) =================
 router.get("/all", async (req, res) => {
   try {
     const user = await verifyToken(req);
@@ -71,12 +72,26 @@ router.get("/all", async (req, res) => {
       return res.status(403).json({ message: "Access Denied" });
     }
 
-    const leaves = await Leave.find()
+    const { date } = req.query;
+
+    let filter = {};
+
+    if (date) {
+      const selectedDate = new Date(date);
+
+      filter = {
+        fromDate: { $lte: selectedDate },
+        toDate: { $gte: selectedDate },
+      };
+    }
+
+    const leaves = await Leave.find(filter)
       .populate("user", "name email department")
-      .sort({ createdAt: -1 });
+      .sort({ fromDate: -1 });
 
     res.json(leaves);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -91,7 +106,7 @@ router.put("/:id", async (req, res) => {
 
     const { status, adminComment } = req.body;
 
-    const leave = await Leave.findById(req.params.id);
+    const leave = await Leave.findById(req.params.id).populate("user");
 
     if (!leave) {
       return res.status(404).json({ message: "Leave Not Found" });
@@ -102,7 +117,29 @@ router.put("/:id", async (req, res) => {
 
     await leave.save();
 
+    // 🔔 CREATE NOTIFICATION FOR EMPLOYEE
+    await Notification.create({
+      user: leave.user._id,
+      title: "Leave Status Updated",
+      message: `Your ${leave.leaveType} leave has been ${status}`,
+    });
+
     res.json({ message: "Leave Updated Successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+// ================= GET MY NOTIFICATIONS =================
+router.get("/notifications", async (req, res) => {
+  try {
+    const user = await verifyToken(req);
+    if (!user) return res.status(401).json({ message: "No Token" });
+
+    const notifications = await Notification.find({
+      user: user._id,
+    }).sort({ createdAt: -1 });
+
+    res.json(notifications);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
