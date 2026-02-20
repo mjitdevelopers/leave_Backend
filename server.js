@@ -295,7 +295,75 @@ app.get("/api/attendance", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// ================= ADMIN: EMPLOYEE FULL MONTH ATTENDANCE (PRESENT + LATE + ABSENT) =================
+// ================= ADMIN: EMPLOYEE MONTH-WISE ATTENDANCE =================
+app.get("/api/attendance/employee/:id", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
 
+    if (!authHeader || !authHeader.startsWith("Bearer")) {
+      return res.status(401).json({ message: "No Token" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const admin = await User.findById(decoded.id);
+
+    if (!admin || admin.role !== "ADMIN") {
+      return res.status(403).json({ message: "Access Denied" });
+    }
+
+    const { month, year } = req.query;
+
+    if (!month || !year) {
+      return res.status(400).json({ message: "Month and Year required" });
+    }
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const records = await Attendance.find({
+      user: req.params.id,
+      date: {
+        $gte: startDate.toISOString().split("T")[0],
+        $lte: endDate.toISOString().split("T")[0],
+      },
+    });
+
+    let fullMonthData = [];
+
+    for (
+      let d = new Date(startDate);
+      d <= endDate;
+      d.setDate(d.getDate() + 1)
+    ) {
+      const formatted = d.toISOString().split("T")[0];
+
+      const record = records.find((r) => r.date === formatted);
+
+      if (record) {
+        fullMonthData.push({
+          date: formatted,
+          status: record.status,
+          checkIn: record.checkIn,
+          checkOut: record.checkOut,
+        });
+      } else {
+        fullMonthData.push({
+          date: formatted,
+          status: "Absent",
+          checkIn: null,
+          checkOut: null,
+        });
+      }
+    }
+
+    res.json(fullMonthData);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
