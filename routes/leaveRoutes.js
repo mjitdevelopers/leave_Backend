@@ -20,6 +20,7 @@ const verifyToken = async (req) => {
 };
 
 // ================= APPLY LEAVE =================
+// ================= APPLY LEAVE (SECURE VERSION) =================
 router.post("/apply", async (req, res) => {
   try {
     const user = await verifyToken(req);
@@ -27,16 +28,66 @@ router.post("/apply", async (req, res) => {
 
     const { leaveType, fromDate, toDate, reason } = req.body;
 
+    if (!leaveType || !fromDate || !toDate || !reason) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
     const start = new Date(fromDate);
     const end = new Date(toDate);
+
+    const today = new Date();
+    const normalizedToday = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+
+    // ❌ Past date block
+    if (start < normalizedToday) {
+      return res.status(400).json({
+        message: "Cannot apply leave for past dates",
+      });
+    }
+
+    // ❌ To < From block
+    if (end < start) {
+      return res.status(400).json({
+        message: "To Date cannot be before From Date",
+      });
+    }
+
+    // ❌ Half Day rule
+    if (leaveType === "Half Day" && start.getTime() !== end.getTime()) {
+      return res.status(400).json({
+        message: "Half Day leave must be same day",
+      });
+    }
+
+    // ❌ OVERLAPPING CHECK
+    const overlappingLeave = await Leave.findOne({
+      user: user._id,
+      status: { $ne: "Rejected" }, // ignore rejected
+      $or: [
+        {
+          fromDate: { $lte: end },
+          toDate: { $gte: start },
+        },
+      ],
+    });
+
+    if (overlappingLeave) {
+      return res.status(400).json({
+        message: "You already have leave applied for selected dates",
+      });
+    }
 
     const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
     const leave = await Leave.create({
       user: user._id,
       leaveType,
-      fromDate,
-      toDate,
+      fromDate: start,
+      toDate: end,
       totalDays: diff,
       reason,
     });
@@ -64,9 +115,10 @@ router.get("/my", async (req, res) => {
   }
 });
 
-// ================= ADMIN: ALL LEAVES (DATE FILTER FIXED) =================
+// ================= ADMIN: ALL LEAVES (SHOW ALL + OPTIONAL DATE FILTER) =================
 router.get("/all", async (req, res) => {
   try {
+    // 🔐 Verify admin
     const user = await verifyToken(req);
     if (!user || user.role !== "ADMIN") {
       return res.status(403).json({ message: "Access Denied" });
@@ -76,6 +128,7 @@ router.get("/all", async (req, res) => {
 
     let filter = {};
 
+    // ✅ If date is provided → filter by that date
     if (date) {
       const selectedDate = new Date(date);
 
@@ -87,7 +140,7 @@ router.get("/all", async (req, res) => {
 
     const leaves = await Leave.find(filter)
       .populate("user", "name email department")
-      .sort({ fromDate: -1 });
+      .sort({ createdAt: -1 }); // newest first
 
     res.json(leaves);
   } catch (error) {
@@ -96,6 +149,7 @@ router.get("/all", async (req, res) => {
   }
 });
 
+// ================= ADMIN: APPROVE / REJECT =================
 // ================= ADMIN: APPROVE / REJECT =================
 router.put("/:id", async (req, res) => {
   try {
@@ -113,15 +167,14 @@ router.put("/:id", async (req, res) => {
     }
 
     leave.status = status;
-    leave.adminComment = adminComment;
-
+    leave.adminComment = adminComment || "";
     await leave.save();
 
-    // 🔔 CREATE NOTIFICATION FOR EMPLOYEE
+    // 🔔 Enhanced Notification
     await Notification.create({
       user: leave.user._id,
       title: "Leave Status Updated",
-      message: `Your ${leave.leaveType} leave has been ${status}`,
+      message: `Your ${leave.leaveType} leave (${leave.fromDate.toISOString().split("T")[0]} - ${leave.toDate.toISOString().split("T")[0]}) has been ${status}. ${adminComment ? "Comment: " + adminComment : ""}`,
     });
 
     res.json({ message: "Leave Updated Successfully" });
