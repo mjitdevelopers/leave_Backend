@@ -6,6 +6,9 @@ const jwt = require("jsonwebtoken");
 const User = require("./models/User");
 const Attendance = require("./models/Attendance");
 
+// ✅ ADD THIS LINE
+const salaryRoutes = require("./routes/salaryRoutes");
+
 dotenv.config();
 connectDB();
 
@@ -16,6 +19,9 @@ app.use(express.json());
 
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/leave", require("./routes/leaveRoutes"));
+
+// ✅ ADD THIS LINE
+app.use("/api/salary", salaryRoutes);
 
 // ================= GET ALL USERS (ADMIN ONLY) =================
 app.get("/api/users", async (req, res) => {
@@ -365,7 +371,6 @@ app.get("/api/attendance/employee/:id", async (req, res) => {
   }
 });
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
