@@ -19,6 +19,8 @@ app.use(express.json());
 
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/leave", require("./routes/leaveRoutes"));
+app.use("/uploads", express.static("uploads"));
+app.use("/api/profile", require("./routes/profileRoutes"));
 
 // ✅ ADD THIS LINE
 app.use("/api/salary", salaryRoutes);
@@ -222,7 +224,44 @@ app.post("/api/attendance/checkout", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+// ================= GET TODAY ATTENDANCE (EMPLOYEE SELF) =================
+app.get("/api/attendance/today", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
 
+    if (!authHeader || !authHeader.startsWith("Bearer")) {
+      return res.status(401).json({ message: "No Token" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.id);
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const attendance = await Attendance.findOne({
+      user: user._id,
+      date: today,
+    });
+
+    if (!attendance) {
+      return res.json({
+        status: "Absent",
+        checkIn: null,
+        checkOut: null,
+      });
+    }
+
+    res.json({
+      status: attendance.status,
+      checkIn: attendance.checkIn,
+      checkOut: attendance.checkOut,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 // ================= ADMIN VIEW ATTENDANCE =================
 app.get("/api/attendance", async (req, res) => {
   try {

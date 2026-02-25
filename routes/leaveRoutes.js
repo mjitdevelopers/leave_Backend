@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const Leave = require("../models/Leave");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
+const Attendance = require("../models/Attendance");
 
 // 🔐 TOKEN VERIFY FUNCTION
 const verifyToken = async (req) => {
@@ -170,7 +171,32 @@ router.put("/:id", async (req, res) => {
     leave.adminComment = adminComment || "";
     await leave.save();
 
-    // 🔔 Enhanced Notification
+    // 🔥 WFH AUTO ATTENDANCE MARK
+    if (status === "Approved" && leave.leaveType === "Work From Home") {
+      let current = new Date(leave.fromDate);
+      const end = new Date(leave.toDate);
+
+      while (current <= end) {
+        const formatted = current.toISOString().split("T")[0];
+
+        await Attendance.findOneAndUpdate(
+          {
+            user: leave.user._id,
+            date: formatted,
+          },
+          {
+            user: leave.user._id,
+            date: formatted,
+            status: "WFH",
+          },
+          { upsert: true },
+        );
+
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    // 🔔 Notification
     await Notification.create({
       user: leave.user._id,
       title: "Leave Status Updated",

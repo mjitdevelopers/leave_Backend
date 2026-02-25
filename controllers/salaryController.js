@@ -4,9 +4,28 @@ const Attendance = require("../models/Attendance");
 // ================================
 // GENERATE SALARY
 // ================================
+// ================================
+// GENERATE SALARY (UPDATED - ADMIN ENTERED COMPONENTS)
+// ================================
 exports.generateSalary = async (req, res) => {
   try {
-    const { employeeId, month, basicSalary } = req.body;
+    const {
+      employeeId,
+      month,
+      basicSalary,
+
+      // 🟢 Earnings (Admin Entered)
+      hra = 0,
+      conveyance = 0,
+      specialAllowance = 0,
+
+      // 🔴 Deductions (Admin Entered)
+      providentFund = 0,
+      esi = 0,
+      loan = 0,
+      professionTax = 0,
+      tds = 0,
+    } = req.body;
 
     if (!employeeId || !month || !basicSalary) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -24,13 +43,12 @@ exports.generateSalary = async (req, res) => {
       .toISOString()
       .split("T")[0];
 
-    // 🔹 Fetch Attendance Records
+    // 🔹 Fetch Attendance Records (NO CHANGE)
     const attendanceRecords = await Attendance.find({
       user: employeeId,
       date: { $gte: startDate, $lte: endDate },
     });
 
-    // 🔹 Convert to map
     const attendanceMap = {};
     attendanceRecords.forEach((record) => {
       attendanceMap[record.date] = record.status;
@@ -46,19 +64,21 @@ exports.generateSalary = async (req, res) => {
       d.getMonth() === monthNumber - 1;
       d.setDate(d.getDate() + 1)
     ) {
-      const day = d.getDay(); // 0 = Sunday
+      const day = d.getDay();
       const formatted = d.toISOString().split("T")[0];
 
-      if (day === 0) continue; // Ignore Sunday
+      if (day === 0) continue;
 
       workingDays++;
 
       const status = attendanceMap[formatted];
 
       if (!status) {
-        absentDays++; // Auto Absent
+        absentDays++;
       } else if (status === "Present") {
         presentDays++;
+      } else if (status === "WFH") {
+        presentDays++; // 🔥 WFH full present count
       } else if (status === "Absent") {
         absentDays++;
       } else if (status === "Late") {
@@ -67,7 +87,9 @@ exports.generateSalary = async (req, res) => {
       }
     }
 
-    // 🔹 Salary Calculation
+    // ================================
+    // ATTENDANCE BASED DEDUCTIONS (UNCHANGED)
+    // ================================
     const perDaySalary = basicSalary / totalDaysInMonth;
     const perHourSalary = perDaySalary / 8;
 
@@ -83,23 +105,65 @@ exports.generateSalary = async (req, res) => {
 
     const absentDeduction = perDaySalary * absentDays;
 
-    const netSalary = basicSalary - lateDeduction - absentDeduction;
+    // ================================
+    // 🟢 EARNINGS CALCULATION
+    // ================================
+    const totalEarnings =
+      Number(basicSalary) +
+      Number(hra) +
+      Number(conveyance) +
+      Number(specialAllowance);
 
-    // 🔹 Save or Update Salary
+    // ================================
+    // 🔴 TOTAL DEDUCTION
+    // ================================
+    const totalDeduction =
+      Number(providentFund) +
+      Number(esi) +
+      Number(loan) +
+      Number(professionTax) +
+      Number(tds) +
+      lateDeduction +
+      absentDeduction;
+
+    // ================================
+    // 💰 NET SALARY
+    // ================================
+    const netSalary = totalEarnings - totalDeduction;
+
+    // ================================
+    // SAVE OR UPDATE
+    // ================================
     const salary = await Salary.findOneAndUpdate(
       { employeeId, month },
       {
         employeeId,
         month,
+
         basicSalary,
+        hra,
+        conveyance,
+        specialAllowance,
+        totalEarnings,
+
         totalDaysInMonth,
         workingDays,
         presentDays,
         absentDays,
         lateCount,
+
+        providentFund,
+        esi,
+        loan,
+        professionTax,
+        tds,
+
         lateDeduction: Number(lateDeduction.toFixed(2)),
         absentDeduction: Number(absentDeduction.toFixed(2)),
+        totalDeduction: Number(totalDeduction.toFixed(2)),
+
         netSalary: Number(netSalary.toFixed(2)),
+
         status: "PENDING",
       },
       { upsert: true, new: true },
@@ -110,7 +174,6 @@ exports.generateSalary = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 // ================================
 // GET EMPLOYEE SALARY
 // ================================
@@ -118,7 +181,9 @@ exports.getEmployeeSalary = async (req, res) => {
   try {
     const salaries = await Salary.find({
       employeeId: req.params.employeeId,
-    }).sort({ createdAt: -1 });
+    })
+      .populate("employeeId", "name designation email")
+      .sort({ createdAt: -1 });
 
     res.json(salaries);
   } catch (error) {
@@ -172,6 +237,25 @@ exports.markSalaryPaid = async (req, res) => {
     await salary.save();
 
     res.json({ message: "Salary marked as PAID", salary });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// ================================
+// GET SINGLE PAYSLIP
+// ================================
+exports.getPayslip = async (req, res) => {
+  try {
+    const salary = await Salary.findById(req.params.salaryId).populate(
+      "employeeId",
+      "name designation email",
+    );
+
+    if (!salary) {
+      return res.status(404).json({ message: "Salary not found" });
+    }
+
+    res.json(salary);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

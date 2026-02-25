@@ -26,7 +26,9 @@ const userSchema = new mongoose.Schema(
       enum: ["ADMIN", "EMPLOYEE"],
       required: true,
     },
-
+    profileImage: {
+      type: String,
+    },
     department: {
       type: String,
       enum: ["IT", "HR", "SALES", "ACCOUNTING", "GRAPHIC DESIGNING"],

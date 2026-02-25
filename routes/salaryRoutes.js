@@ -5,15 +5,27 @@ const {
   generateSalary,
   getEmployeeSalary,
   markSalaryPaid,
+  getPayslip,
 } = require("../controllers/salaryController");
 
-// Generate Salary
+// ================================
+// 💰 GENERATE SALARY (ADMIN)
+// ================================
 router.post("/generate", generateSalary);
 
-// Get Employee Salary
+// ================================
+// 📄 GET ALL SALARIES OF EMPLOYEE
+// ================================
 router.get("/employee/:employeeId", getEmployeeSalary);
 
-// Mark Salary as Paid
+// ================================
+// 🧾 GET SINGLE PAYSLIP
+// ================================
+router.get("/payslip/:salaryId", getPayslip);
+
+// ================================
+// ✅ MARK SALARY AS PAID
+// ================================
 router.patch("/mark-paid/:salaryId", markSalaryPaid);
 
 module.exports = router;
