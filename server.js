@@ -5,6 +5,7 @@ const connectDB = require("./config/db");
 const jwt = require("jsonwebtoken");
 const User = require("./models/User");
 const Attendance = require("./models/Attendance");
+const path = require("path");
 
 // ✅ ADD THIS LINE
 const salaryRoutes = require("./routes/salaryRoutes");
@@ -19,8 +20,9 @@ app.use(express.json());
 
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/leave", require("./routes/leaveRoutes"));
-app.use("/uploads", express.static("uploads"));
 app.use("/api/profile", require("./routes/profileRoutes"));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/api/documents", require("./routes/documentRoutes"));
 
 // ✅ ADD THIS LINE
 app.use("/api/salary", salaryRoutes);
