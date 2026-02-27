@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const User = require("./models/User");
 const Attendance = require("./models/Attendance");
 const path = require("path");
+const taskRoutes = require("./routes/taskRoutes");
 
 // ✅ ADD THIS LINE
 const salaryRoutes = require("./routes/salaryRoutes");
@@ -23,6 +24,7 @@ app.use("/api/leave", require("./routes/leaveRoutes"));
 app.use("/api/profile", require("./routes/profileRoutes"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/documents", require("./routes/documentRoutes"));
+app.use("/api/tasks", taskRoutes);
 
 // ✅ ADD THIS LINE
 app.use("/api/salary", salaryRoutes);
