@@ -42,12 +42,15 @@ exports.register = async (req, res) => {
 };
 
 // ================= LOGIN =================
+// ================= LOGIN =================
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, deviceId } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and Password required" });
+    if (!email || !password || !deviceId) {
+      return res.status(400).json({
+        message: "Email, Password and Device ID required",
+      });
     }
 
     const user = await User.findOne({ email });
@@ -60,6 +63,19 @@ exports.login = async (req, res) => {
 
     if (!match) {
       return res.status(400).json({ message: "Wrong Password" });
+    }
+
+    // 🔥 FIRST TIME LOGIN → Save Device ID
+    if (!user.deviceId) {
+      user.deviceId = deviceId;
+      await user.save();
+    }
+
+    // 🔥 BLOCK LOGIN FROM OTHER DEVICE
+    if (user.deviceId !== deviceId) {
+      return res.status(403).json({
+        message: "This account is already logged in on another device",
+      });
     }
 
     res.json({

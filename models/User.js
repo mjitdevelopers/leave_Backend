@@ -20,7 +20,9 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-
+    deviceId: {
+      type: String,
+    },
     role: {
       type: String,
       enum: ["ADMIN", "EMPLOYEE"],

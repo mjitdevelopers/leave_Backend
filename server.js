@@ -308,13 +308,30 @@ app.get("/api/attendance", async (req, res) => {
         let workingHours = "In Progress";
 
         if (userAttendance.checkIn && userAttendance.checkOut) {
-          const start = new Date(`1970-01-01T${userAttendance.checkIn}`);
-          const end = new Date(`1970-01-01T${userAttendance.checkOut}`);
+          const parseTime = (timeStr) => {
+            const [time, modifier] = timeStr.split(" ");
+            let [hours, minutes, seconds] = time.split(":");
 
-          const diffMs = end - start;
-          const diffHrs = diffMs / (1000 * 60 * 60);
+            hours = parseInt(hours);
+            minutes = parseInt(minutes);
+            seconds = parseInt(seconds);
 
-          workingHours = diffHrs.toFixed(2);
+            if (modifier.toLowerCase() === "pm" && hours !== 12) {
+              hours += 12;
+            }
+            if (modifier.toLowerCase() === "am" && hours === 12) {
+              hours = 0;
+            }
+
+            return new Date(1970, 0, 1, hours, minutes, seconds);
+          };
+
+          const start = parseTime(userAttendance.checkIn);
+          const end = parseTime(userAttendance.checkOut);
+
+          const diff = (end - start) / (1000 * 60 * 60);
+
+          workingHours = diff.toFixed(2);
         }
 
         return {
@@ -392,11 +409,41 @@ app.get("/api/attendance/employee/:id", async (req, res) => {
       const record = records.find((r) => r.date === formatted);
 
       if (record) {
+        let workingHours = "0.00";
+
+        if (record.checkIn && record.checkOut) {
+          const parseTime = (timeStr) => {
+            const [time, modifier] = timeStr.split(" ");
+            let [hours, minutes, seconds] = time.split(":");
+
+            hours = parseInt(hours);
+            minutes = parseInt(minutes);
+            seconds = parseInt(seconds);
+
+            if (modifier.toLowerCase() === "pm" && hours !== 12) {
+              hours += 12;
+            }
+            if (modifier.toLowerCase() === "am" && hours === 12) {
+              hours = 0;
+            }
+
+            return new Date(1970, 0, 1, hours, minutes, seconds);
+          };
+
+          const start = parseTime(record.checkIn);
+          const end = parseTime(record.checkOut);
+
+          const diff = (end - start) / (1000 * 60 * 60);
+
+          workingHours = diff.toFixed(2);
+        }
+
         fullMonthData.push({
           date: formatted,
           status: record.status,
           checkIn: record.checkIn,
           checkOut: record.checkOut,
+          workingHours: workingHours,
         });
       } else {
         fullMonthData.push({
@@ -404,6 +451,7 @@ app.get("/api/attendance/employee/:id", async (req, res) => {
           status: "Absent",
           checkIn: null,
           checkOut: null,
+          workingHours: "0.00",
         });
       }
     }
