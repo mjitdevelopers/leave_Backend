@@ -37,3 +37,17 @@ exports.deleteExpense = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// Update Expense
+exports.updateExpense = async (req, res) => {
+  try {
+    const expense = await CompanyExpense.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true },
+    );
+
+    res.json(expense);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
