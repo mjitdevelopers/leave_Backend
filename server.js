@@ -7,6 +7,7 @@ const User = require("./models/User");
 const Attendance = require("./models/Attendance");
 const path = require("path");
 const taskRoutes = require("./routes/taskRoutes");
+const companyExpenseRoutes = require("./routes/companyExpenseRoutes");
 
 // ✅ ADD THIS LINE
 const salaryRoutes = require("./routes/salaryRoutes");
@@ -25,6 +26,7 @@ app.use("/api/profile", require("./routes/profileRoutes"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/documents", require("./routes/documentRoutes"));
 app.use("/api/tasks", taskRoutes);
+app.use("/api/company-expense", companyExpenseRoutes);
 
 // ✅ ADD THIS LINE
 app.use("/api/salary", salaryRoutes);
