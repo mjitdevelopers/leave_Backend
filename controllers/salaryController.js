@@ -139,7 +139,8 @@ exports.generateSalary = async (req, res) => {
       {
         employeeId,
         month,
-
+        periodFrom: startDate,
+        periodTo: endDate,
         basicSalary,
         hra,
         conveyance,

@@ -73,7 +73,13 @@ const salarySchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    periodFrom: {
+      type: String,
+    },
 
+    periodTo: {
+      type: String,
+    },
     esi: {
       type: Number,
       default: 0,
