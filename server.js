@@ -1,6 +1,8 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const connectDB = require("./config/db");
 const jwt = require("jsonwebtoken");
 const User = require("./models/User");
@@ -14,11 +16,20 @@ const salaryRoutes = require("./routes/salaryRoutes");
 
 dotenv.config();
 connectDB();
-
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Security
+app.use(helmet());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+app.use(limiter);
 
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/leave", require("./routes/leaveRoutes"));
