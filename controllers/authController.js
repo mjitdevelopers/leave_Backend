@@ -37,10 +37,7 @@ exports.register = async (req, res) => {
 
     res.status(201).json({ message: "Registered Successfully" });
   } catch (error) {
-    console.log("REGISTER ERROR:", error);
-    res.status(500).json({
-      message: error.message,
-    });
+    res.status(500).json({ message: "Registration Failed" });
   }
 };
 
@@ -102,6 +99,7 @@ exports.login = async (req, res) => {
     });
   }
 };
+
 // ================= SEND OTP =================
 exports.sendOTP = async (req, res) => {
   try {
