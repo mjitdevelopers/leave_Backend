@@ -37,7 +37,10 @@ exports.register = async (req, res) => {
 
     res.status(201).json({ message: "Registered Successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Registration Failed" });
+    console.log("REGISTER ERROR:", error);
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
@@ -45,37 +48,24 @@ exports.register = async (req, res) => {
 // ================= LOGIN =================
 exports.login = async (req, res) => {
   try {
-    const { email, password, deviceId } = req.body;
+    console.log("LOGIN BODY:", req.body);
 
-    if (!email || !password || !deviceId) {
-      return res.status(400).json({
-        message: "Email, Password and Device ID required",
-      });
-    }
+    const { email, password } = req.body;
 
     const user = await User.findOne({ email });
 
+    console.log("USER FOUND:", user);
+
     if (!user) {
-      return res.status(400).json({ message: "Please Signup First" });
+      return res.status(400).json({ message: "User not found" });
     }
 
     const match = await bcrypt.compare(password, user.password);
 
+    console.log("PASSWORD MATCH:", match);
+
     if (!match) {
       return res.status(400).json({ message: "Wrong Password" });
-    }
-
-    // 🔥 FIRST TIME LOGIN → Save Device ID
-    if (!user.deviceId) {
-      user.deviceId = deviceId;
-      await user.save();
-    }
-
-    // 🔥 BLOCK LOGIN FROM OTHER DEVICE
-    if (user.deviceId !== deviceId) {
-      return res.status(403).json({
-        message: "This account is already logged in on another device",
-      });
     }
 
     res.json({
@@ -84,10 +74,13 @@ exports.login = async (req, res) => {
       name: user.name,
     });
   } catch (error) {
-    res.status(500).json({ message: "Login Failed" });
+    console.log("LOGIN ERROR:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
-
 // ================= SEND OTP =================
 exports.sendOTP = async (req, res) => {
   try {
