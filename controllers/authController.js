@@ -52,22 +52,43 @@ exports.login = async (req, res) => {
 
     const { email, password } = req.body;
 
+    // 🔴 Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and Password required",
+      });
+    }
+
+    // 🔎 Find user
     const user = await User.findOne({ email });
 
     console.log("USER FOUND:", user);
 
     if (!user) {
-      return res.status(400).json({ message: "User not found" });
+      return res.status(400).json({
+        message: "User not found",
+      });
     }
 
+    // 🔴 Check password exists
+    if (!user.password) {
+      return res.status(500).json({
+        message: "User password missing in database",
+      });
+    }
+
+    // 🔐 Compare password
     const match = await bcrypt.compare(password, user.password);
 
     console.log("PASSWORD MATCH:", match);
 
     if (!match) {
-      return res.status(400).json({ message: "Wrong Password" });
+      return res.status(400).json({
+        message: "Wrong Password",
+      });
     }
 
+    // ✅ Success response
     res.json({
       token: generateToken(user._id),
       role: user.role,
