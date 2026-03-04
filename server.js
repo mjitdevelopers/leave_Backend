@@ -15,10 +15,22 @@ const companyExpenseRoutes = require("./routes/companyExpenseRoutes");
 const salaryRoutes = require("./routes/salaryRoutes");
 
 dotenv.config();
+// 🔴 GLOBAL ERROR HANDLER ADD HERE
+process.on("uncaughtException", (err) => {
+  console.log("UNCAUGHT EXCEPTION:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.log("UNHANDLED REJECTION:", err);
+});
 connectDB();
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+  }),
+);
 app.use(express.json());
 
 // Security
