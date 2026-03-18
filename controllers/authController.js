@@ -45,12 +45,15 @@ exports.register = async (req, res) => {
 // ================= LOGIN =================
 exports.login = async (req, res) => {
   try {
-    console.log("LOGIN BODY:", req.body);
+    console.log("========== LOGIN API CALLED ==========");
+    console.log("REQUEST BODY:", req.body);
 
     const { email, password } = req.body;
 
     // 🔴 Validate input
     if (!email || !password) {
+      console.log("❌ Email or Password missing");
+
       return res.status(400).json({
         message: "Email and Password required",
       });
@@ -62,6 +65,8 @@ exports.login = async (req, res) => {
     console.log("USER FOUND:", user);
 
     if (!user) {
+      console.log("❌ USER NOT FOUND");
+
       return res.status(400).json({
         message: "User not found",
       });
@@ -69,30 +74,40 @@ exports.login = async (req, res) => {
 
     // 🔴 Check password exists
     if (!user.password) {
+      console.log("❌ PASSWORD FIELD MISSING IN DB");
+
       return res.status(500).json({
         message: "User password missing in database",
       });
     }
 
     // 🔐 Compare password
+    console.log("ENTERED PASSWORD:", password);
+    console.log("HASHED PASSWORD:", user.password);
+
     const match = await bcrypt.compare(password, user.password);
 
-    console.log("PASSWORD MATCH:", match);
+    console.log("PASSWORD MATCH RESULT:", match);
 
     if (!match) {
+      console.log("❌ PASSWORD NOT MATCHED");
+
       return res.status(400).json({
         message: "Wrong Password",
       });
     }
 
     // ✅ Success response
+    console.log("✅ LOGIN SUCCESS");
+
     res.json({
       token: generateToken(user._id),
       role: user.role,
       name: user.name,
     });
   } catch (error) {
-    console.log("LOGIN ERROR:", error);
+    console.log("🔥 LOGIN ERROR OCCURRED");
+    console.log(error);
 
     res.status(500).json({
       message: error.message,
