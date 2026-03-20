@@ -135,7 +135,7 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
 app.post("/api/attendance/checkin", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude } = req.body; // ✅ time काढलं
 
     if (!authHeader || !authHeader.startsWith("Bearer")) {
       return res.status(401).json({ message: "No Token" });
@@ -146,9 +146,8 @@ app.post("/api/attendance/checkin", async (req, res) => {
 
     const user = await User.findById(decoded.id);
 
-    // 🔥 MJIT OFFICE LOCATION
-    const officeLat = 17.706828;
-    const officeLng = 73.980128;
+    const officeLat = 17.706929;
+    const officeLng = 73.980166;
 
     const distance = getDistanceFromLatLonInMeters(
       latitude,
@@ -157,14 +156,18 @@ app.post("/api/attendance/checkin", async (req, res) => {
       officeLng,
     );
 
-    // 🔒 100 meters allowed
-    if (distance > 200) {
+    if (distance > 500) {
       return res.status(400).json({
         message: "You are not at Office Location",
       });
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    // ✅ FIXED TIME
+    const now = new Date();
+
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Kolkata",
+    });
 
     const existing = await Attendance.findOne({
       user: user._id,
@@ -177,13 +180,11 @@ app.post("/api/attendance/checkin", async (req, res) => {
       });
     }
 
-    const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
 
     let status = "Present";
 
-    // ⏰ Late after 10:30 AM
     if (hour > 10 || (hour === 10 && minute > 30)) {
       status = "Late";
     }
@@ -191,27 +192,27 @@ app.post("/api/attendance/checkin", async (req, res) => {
     await Attendance.create({
       user: user._id,
       date: today,
-      checkIn: now.toLocaleTimeString(),
-      status: status,
-      latitude: latitude,
-      longitude: longitude,
+      checkIn: now, // ✅ DATE SAVE होईल
+      status,
+      latitude,
+      longitude,
       locationName: "MJIT Solutions Office",
     });
 
     res.json({
       message: "Check-In Successful",
-      status: status,
-      distanceInMeters: Math.round(distance),
+      status,
     });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: error.message });
   }
 });
-
 // ================= CHECK-OUT =================
 app.post("/api/attendance/checkout", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
+    const { time } = req.body;
 
     if (!authHeader || !authHeader.startsWith("Bearer")) {
       return res.status(401).json({ message: "No Token" });
@@ -222,7 +223,11 @@ app.post("/api/attendance/checkout", async (req, res) => {
 
     const user = await User.findById(decoded.id);
 
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "Asia/Kolkata",
+    });
 
     const attendance = await Attendance.findOne({
       user: user._id,
@@ -235,159 +240,28 @@ app.post("/api/attendance/checkout", async (req, res) => {
       });
     }
 
-    const now = new Date();
-
-    if (now.getHours() < 18) {
+    if (attendance.checkOut) {
       return res.status(400).json({
-        message: "Checkout allowed after 6 PM",
+        message: "Already Checked Out",
       });
     }
 
-    attendance.checkOut = now.toLocaleTimeString();
+    // optional remove restriction for testing
+    // if (now.getHours() < 18) return...
+
+    attendance.checkOut = now; // 🔥 DATE TYPE
+
     await attendance.save();
 
     res.json({
       message: "Check-Out Successful",
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-// ================= GET TODAY ATTENDANCE (EMPLOYEE SELF) =================
-app.get("/api/attendance/today", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer")) {
-      return res.status(401).json({ message: "No Token" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await User.findById(decoded.id);
-
-    const today = new Date().toISOString().split("T")[0];
-
-    const attendance = await Attendance.findOne({
-      user: user._id,
-      date: today,
-    });
-
-    if (!attendance) {
-      return res.json({
-        status: "Absent",
-        checkIn: null,
-        checkOut: null,
-      });
-    }
-
-    res.json({
-      status: attendance.status,
-      checkIn: attendance.checkIn,
-      checkOut: attendance.checkOut,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-// ================= ADMIN VIEW ATTENDANCE =================
-app.get("/api/attendance", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer")) {
-      return res.status(401).json({ message: "No Token" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const admin = await User.findById(decoded.id);
-
-    if (!admin || admin.role !== "ADMIN") {
-      return res.status(403).json({ message: "Access Denied" });
-    }
-
-    // ✅ DATE FROM QUERY
-    const { date } = req.query;
-    const selectedDate = date || new Date().toISOString().split("T")[0];
-
-    // 🔥 GET ALL USERS
-    const allUsers = await User.find({ role: { $ne: "ADMIN" } });
-
-    // 🔥 GET ATTENDANCE OF SELECTED DATE
-    const records = await Attendance.find({ date: selectedDate }).populate(
-      "user",
-      "name email role",
-    );
-
-    // 🔥 MAP USER-WISE ATTENDANCE
-    const finalData = allUsers.map((user) => {
-      const userAttendance = records.find(
-        (r) => r.user._id.toString() === user._id.toString(),
-      );
-
-      // 🔹 If attendance exists
-      if (userAttendance) {
-        let workingHours = "In Progress";
-
-        if (userAttendance.checkIn && userAttendance.checkOut) {
-          const parseTime = (timeStr) => {
-            const [time, modifier] = timeStr.split(" ");
-            let [hours, minutes, seconds] = time.split(":");
-
-            hours = parseInt(hours);
-            minutes = parseInt(minutes);
-            seconds = parseInt(seconds);
-
-            if (modifier.toLowerCase() === "pm" && hours !== 12) {
-              hours += 12;
-            }
-            if (modifier.toLowerCase() === "am" && hours === 12) {
-              hours = 0;
-            }
-
-            return new Date(1970, 0, 1, hours, minutes, seconds);
-          };
-
-          const start = parseTime(userAttendance.checkIn);
-          const end = parseTime(userAttendance.checkOut);
-
-          const diff = (end - start) / (1000 * 60 * 60);
-
-          workingHours = diff.toFixed(2);
-        }
-
-        return {
-          user: user,
-          date: selectedDate,
-          status: userAttendance.status,
-          checkIn: userAttendance.checkIn,
-          checkOut: userAttendance.checkOut,
-          workingHours: workingHours,
-        };
-      }
-
-      // 🔹 If NO attendance → ABSENT
-      return {
-        user: user,
-        date: selectedDate,
-        status: "Absent",
-        checkIn: null,
-        checkOut: null,
-        workingHours: "0.00",
-      };
-    });
-
-    res.json(finalData);
-  } catch (error) {
     console.log(error);
     res.status(500).json({ message: error.message });
   }
 });
-// ================= ADMIN: EMPLOYEE FULL MONTH ATTENDANCE (PRESENT + LATE + ABSENT) =================
-// ================= ADMIN: EMPLOYEE MONTH-WISE ATTENDANCE =================
+// ================= GET TODAY ATTENDANCE (EMPLOYEE SELF) =================
 app.get("/api/attendance/employee/:id", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -437,37 +311,27 @@ app.get("/api/attendance/employee/:id", async (req, res) => {
         let workingHours = "0.00";
 
         if (record.checkIn && record.checkOut) {
-          const parseTime = (timeStr) => {
-            const [time, modifier] = timeStr.split(" ");
-            let [hours, minutes, seconds] = time.split(":");
-
-            hours = parseInt(hours);
-            minutes = parseInt(minutes);
-            seconds = parseInt(seconds);
-
-            if (modifier.toLowerCase() === "pm" && hours !== 12) {
-              hours += 12;
-            }
-            if (modifier.toLowerCase() === "am" && hours === 12) {
-              hours = 0;
-            }
-
-            return new Date(1970, 0, 1, hours, minutes, seconds);
-          };
-
-          const start = parseTime(record.checkIn);
-          const end = parseTime(record.checkOut);
+          // ✅ ISO time direct use
+          const start = new Date(record.checkIn);
+          const end = new Date(record.checkOut);
 
           const diff = (end - start) / (1000 * 60 * 60);
-
           workingHours = diff.toFixed(2);
         }
 
         fullMonthData.push({
           date: formatted,
           status: record.status,
-          checkIn: record.checkIn,
-          checkOut: record.checkOut,
+
+          // ✅ UI friendly time
+          checkIn: record.checkIn
+            ? new Date(record.checkIn).toLocaleTimeString()
+            : null,
+
+          checkOut: record.checkOut
+            ? new Date(record.checkOut).toLocaleTimeString()
+            : null,
+
           workingHours: workingHours,
         });
       } else {
@@ -486,7 +350,141 @@ app.get("/api/attendance/employee/:id", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-const PORT = process.env.PORT || 5000;
+// ================= ADMIN VIEW ATTENDANCE =================
+app.get("/api/attendance", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const admin = await User.findById(decoded.id);
+
+    if (!admin || admin.role !== "ADMIN") {
+      return res.status(403).json({ message: "Access Denied" });
+    }
+
+    const selectedDate =
+      req.query.date ||
+      new Date().toLocaleDateString("en-CA", {
+        timeZone: "Asia/Kolkata",
+      });
+
+    const allUsers = await User.find({ role: { $ne: "ADMIN" } });
+
+    const records = await Attendance.find({ date: selectedDate }).populate(
+      "user",
+      "name email",
+    );
+
+    const finalData = allUsers.map((user) => {
+      const record = records.find(
+        (r) => r.user._id.toString() === user._id.toString(),
+      );
+
+      if (record) {
+        return {
+          user,
+          date: selectedDate,
+          status: record.status,
+
+          // ✅ IST TIME FIX
+          checkIn: formatISTTime(record.checkIn),
+          checkOut: formatISTTime(record.checkOut),
+
+          // ✅ WORKING HOURS FIX
+          workingHours: calculateWorkingHours(record.checkIn, record.checkOut),
+        };
+      }
+
+      return {
+        user,
+        date: selectedDate,
+        status: "Absent",
+        checkIn: null,
+        checkOut: null,
+        workingHours: "0.00",
+      };
+    });
+
+    res.json(finalData);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+// ================= ADMIN: EMPLOYEE FULL MONTH ATTENDANCE (PRESENT + LATE + ABSENT) =================
+// ================= ADMIN: EMPLOYEE MONTH-WISE ATTENDANCE =================
+app.get("/api/attendance/employee/:id", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const admin = await User.findById(decoded.id);
+
+    if (!admin || admin.role !== "ADMIN") {
+      return res.status(403).json({ message: "Access Denied" });
+    }
+
+    const { month, year } = req.query;
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const start = startDate.toLocaleDateString("en-CA", {
+      timeZone: "Asia/Kolkata",
+    });
+
+    const end = endDate.toLocaleDateString("en-CA", {
+      timeZone: "Asia/Kolkata",
+    });
+
+    const records = await Attendance.find({
+      user: req.params.id,
+      date: { $gte: start, $lte: end },
+    });
+
+    let fullMonthData = [];
+
+    for (
+      let d = new Date(startDate);
+      d <= endDate;
+      d.setDate(d.getDate() + 1)
+    ) {
+      const formatted = d.toLocaleDateString("en-CA", {
+        timeZone: "Asia/Kolkata",
+      });
+
+      const record = records.find((r) => r.date === formatted);
+
+      if (record) {
+        fullMonthData.push({
+          date: formatted,
+          status: record.status,
+
+          // ✅ IST TIME FIX
+          checkIn: formatISTTime(record.checkIn),
+          checkOut: formatISTTime(record.checkOut),
+
+          // ✅ WORKING HOURS FIX
+          workingHours: calculateWorkingHours(record.checkIn, record.checkOut),
+        });
+      } else {
+        fullMonthData.push({
+          date: formatted,
+          status: "Absent",
+          checkIn: null,
+          checkOut: null,
+          workingHours: "0.00",
+        });
+      }
+    }
+
+    res.json(fullMonthData);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error.message });
+  }
+});
+const PORT = process.env.PORT || 6004;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

@@ -200,9 +200,17 @@ router.put("/:id", async (req, res) => {
     await Notification.create({
       user: leave.user._id,
       title: "Leave Status Updated",
-      message: `Your ${leave.leaveType} leave (${leave.fromDate.toISOString().split("T")[0]} - ${leave.toDate.toISOString().split("T")[0]}) has been ${status}. ${adminComment ? "Comment: " + adminComment : ""}`,
+      message: `Your ${leave.leaveType} leave (${leave.fromDate.toLocaleString(
+        "en-IN",
+        {
+          timeZone: "Asia/Kolkata",
+        },
+      )} - ${leave.toDate.toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+      })}) has been ${status}. ${
+        adminComment ? "Comment: " + adminComment : ""
+      }`,
     });
-
     res.json({ message: "Leave Updated Successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });

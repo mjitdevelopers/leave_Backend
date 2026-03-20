@@ -11,18 +11,20 @@ const attendanceSchema = new mongoose.Schema(
       type: String,
     },
 
+    // 🔥 FIX: Date type
     checkIn: {
-      type: String,
+      type: Date,
     },
 
     checkOut: {
-      type: String,
+      type: Date,
     },
 
     status: {
       type: String,
       enum: ["Present", "Late", "WFH"],
     },
+
     locationName: {
       type: String,
     },
