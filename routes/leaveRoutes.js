@@ -86,6 +86,7 @@ router.post("/apply", async (req, res) => {
 
     const leave = await Leave.create({
       user: user._id,
+      employeeName: user.name,
       leaveType,
       fromDate: start,
       toDate: end,
