@@ -2,10 +2,7 @@ const Salary = require("../models/Salary");
 const Attendance = require("../models/Attendance");
 
 // ================================
-// GENERATE SALARY
-// ================================
-// ================================
-// GENERATE SALARY (UPDATED - ADMIN ENTERED COMPONENTS)
+// 💰 GENERATE SALARY
 // ================================
 exports.generateSalary = async (req, res) => {
   try {
@@ -14,12 +11,10 @@ exports.generateSalary = async (req, res) => {
       month,
       basicSalary,
 
-      // 🟢 Earnings (Admin Entered)
       hra = 0,
       conveyance = 0,
       specialAllowance = 0,
 
-      // 🔴 Deductions (Admin Entered)
       providentFund = 0,
       esi = 0,
       loan = 0,
@@ -43,7 +38,7 @@ exports.generateSalary = async (req, res) => {
       .toISOString()
       .split("T")[0];
 
-    // 🔹 Fetch Attendance Records (NO CHANGE)
+    // 🔹 Attendance Fetch
     const attendanceRecords = await Attendance.find({
       user: employeeId,
       date: { $gte: startDate, $lte: endDate },
@@ -75,10 +70,8 @@ exports.generateSalary = async (req, res) => {
 
       if (!status) {
         absentDays++;
-      } else if (status === "Present") {
+      } else if (status === "Present" || status === "WFH") {
         presentDays++;
-      } else if (status === "WFH") {
-        presentDays++; // 🔥 WFH full present count
       } else if (status === "Absent") {
         absentDays++;
       } else if (status === "Late") {
@@ -88,9 +81,66 @@ exports.generateSalary = async (req, res) => {
     }
 
     // ================================
-    // ATTENDANCE BASED DEDUCTIONS (UNCHANGED)
+    // 🧮 SALARY CALCULATION
     // ================================
     const perDaySalary = basicSalary / totalDaysInMonth;
+
+    // ✅ earned salary
+    const earnedBasic = perDaySalary * presentDays;
+
+    // 👉 attendance = 0 case
+    if (presentDays === 0) {
+      const salary = await Salary.findOneAndUpdate(
+        { employeeId, month },
+        {
+          employeeId,
+          month,
+          periodFrom: startDate,
+          periodTo: endDate,
+
+          basicSalary: 0,
+          hra: 0,
+          conveyance: 0,
+          specialAllowance: 0,
+          totalEarnings: 0,
+
+          totalDaysInMonth,
+          workingDays,
+          presentDays,
+          absentDays,
+          lateCount,
+
+          providentFund: 0,
+          esi: 0,
+          loan: 0,
+          professionTax: 0,
+          tds: 0,
+
+          lateDeduction: 0,
+          absentDeduction: 0,
+          totalDeduction: 0,
+
+          netSalary: 0,
+          status: "PENDING",
+        },
+        { upsert: true, new: true },
+      );
+
+      return res.json(salary);
+    }
+
+    // ================================
+    // 🟢 EARNINGS
+    // ================================
+    const totalEarnings =
+      Number(earnedBasic) +
+      Number(hra) +
+      Number(conveyance) +
+      Number(specialAllowance);
+
+    // ================================
+    // 🔴 DEDUCTIONS
+    // ================================
     const perHourSalary = perDaySalary / 8;
 
     let lateDeduction = 0;
@@ -103,28 +153,13 @@ exports.generateSalary = async (req, res) => {
       lateDeduction = perDaySalary;
     }
 
-    const absentDeduction = perDaySalary * absentDays;
-
-    // ================================
-    // 🟢 EARNINGS CALCULATION
-    // ================================
-    const totalEarnings =
-      Number(basicSalary) +
-      Number(hra) +
-      Number(conveyance) +
-      Number(specialAllowance);
-
-    // ================================
-    // 🔴 TOTAL DEDUCTION
-    // ================================
     const totalDeduction =
       Number(providentFund) +
       Number(esi) +
       Number(loan) +
       Number(professionTax) +
       Number(tds) +
-      lateDeduction +
-      absentDeduction;
+      lateDeduction;
 
     // ================================
     // 💰 NET SALARY
@@ -132,7 +167,7 @@ exports.generateSalary = async (req, res) => {
     const netSalary = totalEarnings - totalDeduction;
 
     // ================================
-    // SAVE OR UPDATE
+    // SAVE
     // ================================
     const salary = await Salary.findOneAndUpdate(
       { employeeId, month },
@@ -141,11 +176,12 @@ exports.generateSalary = async (req, res) => {
         month,
         periodFrom: startDate,
         periodTo: endDate,
-        basicSalary,
+
+        basicSalary: Number(earnedBasic.toFixed(2)),
         hra,
         conveyance,
         specialAllowance,
-        totalEarnings,
+        totalEarnings: Number(totalEarnings.toFixed(2)),
 
         totalDaysInMonth,
         workingDays,
@@ -160,11 +196,10 @@ exports.generateSalary = async (req, res) => {
         tds,
 
         lateDeduction: Number(lateDeduction.toFixed(2)),
-        absentDeduction: Number(absentDeduction.toFixed(2)),
+        absentDeduction: 0,
         totalDeduction: Number(totalDeduction.toFixed(2)),
 
         netSalary: Number(netSalary.toFixed(2)),
-
         status: "PENDING",
       },
       { upsert: true, new: true },
@@ -175,8 +210,9 @@ exports.generateSalary = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 // ================================
-// GET EMPLOYEE SALARY
+// 📄 GET EMPLOYEE SALARY
 // ================================
 exports.getEmployeeSalary = async (req, res) => {
   try {
@@ -193,30 +229,8 @@ exports.getEmployeeSalary = async (req, res) => {
 };
 
 // ================================
-// MARK SALARY AS PAID
+// ✅ MARK SALARY AS PAID
 // ================================
-exports.markSalaryPaid = async (req, res) => {
-  try {
-    const salary = await Salary.findById(req.params.salaryId);
-
-    if (!salary) {
-      return res.status(404).json({ message: "Salary not found" });
-    }
-
-    if (salary.status === "PAID") {
-      return res.status(400).json({ message: "Already Paid" });
-    }
-
-    salary.status = "PAID";
-    salary.paidDate = new Date();
-
-    await salary.save();
-
-    res.json({ message: "Salary marked as PAID", salary });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 exports.markSalaryPaid = async (req, res) => {
   try {
     const { paymentMode } = req.body;
@@ -242,8 +256,9 @@ exports.markSalaryPaid = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 // ================================
-// GET SINGLE PAYSLIP
+// 🧾 GET SINGLE PAYSLIP
 // ================================
 exports.getPayslip = async (req, res) => {
   try {
