@@ -57,13 +57,6 @@ exports.checkOut = async (req, res) => {
     const now = getISTTime();
     const date = now.format("YYYY-MM-DD");
 
-    // ✅ 6 PM restriction
-    if (now.hour() < 18) {
-      return res.status(400).json({
-        msg: "Check-out allowed only after 3:00 PM ❌",
-      });
-    }
-
     const attendance = await Attendance.findOne({
       user: req.user.id,
       date,

@@ -81,15 +81,24 @@ exports.generateSalary = async (req, res) => {
     }
 
     // ================================
-    // 🧮 SALARY CALCULATION
+    // 🧮 SALARY CALCULATION (HOURS BASED)
     // ================================
+
+    // 👉 total working hours
+    const totalWorkingHours = attendanceRecords.reduce(
+      (sum, record) => sum + (record.workingHours || 0),
+      0,
+    );
+
+    // 👉 per day & per hour salary
     const perDaySalary = basicSalary / totalDaysInMonth;
+    const perHourSalary = perDaySalary / 8;
 
-    // ✅ earned salary
-    const earnedBasic = perDaySalary * presentDays;
+    // 👉 earned salary
+    const earnedBasic = totalWorkingHours * perHourSalary;
 
-    // 👉 attendance = 0 case
-    if (presentDays === 0) {
+    // 👉 attendance = 0 case (NOW HOURS BASED)
+    if (totalWorkingHours === 0) {
       const salary = await Salary.findOneAndUpdate(
         { employeeId, month },
         {
@@ -141,18 +150,26 @@ exports.generateSalary = async (req, res) => {
     // ================================
     // 🔴 DEDUCTIONS
     // ================================
-    const perHourSalary = perDaySalary / 8;
+    // ================================
+    // 🔴 DEDUCTIONS (UPDATED)
+    // ================================
 
     let lateDeduction = 0;
 
+    // 👉 1 late = 1 hour deduction
     if (lateCount <= 2) {
       lateDeduction = perHourSalary * lateCount;
-    } else if (lateCount === 3) {
+    }
+    // 👉 3 late = half day
+    else if (lateCount === 3) {
       lateDeduction = perDaySalary / 2;
-    } else {
+    }
+    // 👉 more than 3 = full day
+    else {
       lateDeduction = perDaySalary;
     }
 
+    // 👉 total deduction
     const totalDeduction =
       Number(providentFund) +
       Number(esi) +
@@ -160,7 +177,6 @@ exports.generateSalary = async (req, res) => {
       Number(professionTax) +
       Number(tds) +
       lateDeduction;
-
     // ================================
     // 💰 NET SALARY
     // ================================
@@ -178,6 +194,8 @@ exports.generateSalary = async (req, res) => {
         periodTo: endDate,
 
         basicSalary: Number(earnedBasic.toFixed(2)),
+        totalWorkingHours: Number(totalWorkingHours.toFixed(2)),
+        perHourSalary: Number(perHourSalary.toFixed(2)),
         hra,
         conveyance,
         specialAllowance,
