@@ -58,9 +58,9 @@ exports.checkOut = async (req, res) => {
     const date = now.format("YYYY-MM-DD");
 
     // ✅ 6 PM restriction
-    if (now.hour() < 18) {
+    if (now.hour() < 15) {
       return res.status(400).json({
-        msg: "Check-out allowed only after 6:00 PM ❌",
+        msg: "Check-out allowed only after 3:00 PM ❌",
       });
     }
 
@@ -134,15 +134,31 @@ exports.getAttendanceByDate = async (req, res) => {
   try {
     const { date } = req.query;
 
-    console.log("DATE:", date);
+    const users = await User.find();
 
-    const data = await Attendance.find({
-      date: date, // ✅ FIX (string match)
-    }).populate("user", "name email");
+    let result = [];
 
-    console.log("FOUND DATA:", data);
+    for (let user of users) {
+      const record = await Attendance.findOne({
+        user: user._id,
+        date: date,
+      }).populate("user", "name email");
 
-    res.json(data);
+      if (record) {
+        result.push(record);
+      } else {
+        result.push({
+          user: {
+            name: user.name,
+            email: user.email,
+          },
+          date: date,
+          status: "Absent",
+        });
+      }
+    }
+
+    res.json(result);
   } catch (error) {
     res.status(500).json({ msg: error.message });
   }
