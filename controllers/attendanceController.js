@@ -1,6 +1,7 @@
 const Attendance = require("../models/Attendance");
 const moment = require("moment-timezone");
 const { getISTTime, getDistance } = require("../utils/helper");
+const User = require("../models/User"); // ✅ ADD THIS
 
 // 📍 Office Location (UPDATED)
 const OFFICE_LAT = 17.706929;
