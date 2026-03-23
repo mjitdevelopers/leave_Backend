@@ -12,7 +12,7 @@ exports.checkIn = async (req, res) => {
     const { latitude, longitude } = req.body;
 
     const distance = getDistance(latitude, longitude, OFFICE_LAT, OFFICE_LON);
-    if (distance > 1000) {
+    if (distance > 400) {
       return res.status(400).json({
         msg: `You are ${Math.round(distance)}m away from office ❌`,
       });
@@ -133,16 +133,17 @@ exports.getAttendanceByDate = async (req, res) => {
   try {
     const { date } = req.query;
 
-    // admin check
-    if (req.user.role.toLowerCase() !== "admin") {
-      return res.status(403).json({ msg: "Access denied ❌" });
-    }
+    console.log("DATE:", date);
 
-    const data = await Attendance.find({ date }).populate("user", "name email");
+    const data = await Attendance.find({
+      date: date, // ✅ FIX (string match)
+    }).populate("user", "name email");
+
+    console.log("FOUND DATA:", data);
 
     res.json(data);
-  } catch (err) {
-    res.status(500).json({ msg: err.message });
+  } catch (error) {
+    res.status(500).json({ msg: error.message });
   }
 };
 // ✅ ADMIN - EMPLOYEE MONTHLY ATTENDANCE
@@ -150,8 +151,10 @@ exports.getEmployeeAttendance = async (req, res) => {
   try {
     const { userId, month, year } = req.query;
 
-    // 🔐 Admin check
-    if (req.user.role !== "ADMIN") {
+    // 🔥 FIX (DB मधून role check)
+    const user = await User.findById(req.user.id);
+
+    if (!user || user.role !== "ADMIN") {
       return res.status(403).json({ msg: "Access denied ❌" });
     }
 

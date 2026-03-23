@@ -5,8 +5,12 @@ const otpGenerator = require("otp-generator");
 const transporter = require("../config/mail");
 
 // ================= TOKEN =================
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+const generateToken = (id, role) => {
+  return jwt.sign(
+    { id, role }, // 🔥 role add केला
+    process.env.JWT_SECRET,
+    { expiresIn: "30d" },
+  );
 };
 
 // ================= REGISTER =================
@@ -63,7 +67,7 @@ exports.login = async (req, res) => {
     }
 
     res.json({
-      token: generateToken(user._id),
+      token: generateToken(user._id, user.role),
       role: user.role,
       name: user.name,
     });
