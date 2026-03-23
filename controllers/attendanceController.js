@@ -13,7 +13,7 @@ exports.checkIn = async (req, res) => {
     const { latitude, longitude } = req.body;
 
     const distance = getDistance(latitude, longitude, OFFICE_LAT, OFFICE_LON);
-    if (distance > 400) {
+    if (distance > 200) {
       return res.status(400).json({
         msg: `You are ${Math.round(distance)}m away from office ❌`,
       });
