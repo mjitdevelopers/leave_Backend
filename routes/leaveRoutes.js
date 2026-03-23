@@ -217,6 +217,28 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+router.delete("/:id", async (req, res) => {
+  try {
+    const user = await verifyToken(req);
+
+    if (!user || user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Access Denied" });
+    }
+
+    const leave = await Leave.findById(req.params.id);
+
+    if (!leave) {
+      return res.status(404).json({ message: "Leave not found" });
+    }
+
+    await Leave.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Leave deleted successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error.message });
+  }
+});
 // ================= GET MY NOTIFICATIONS =================
 router.get("/notifications", async (req, res) => {
   try {

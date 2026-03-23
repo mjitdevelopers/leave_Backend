@@ -134,7 +134,7 @@ exports.getAttendanceByDate = async (req, res) => {
     const { date } = req.query;
 
     // admin check
-    if (req.user.role !== "ADMIN") {
+    if (req.user.role.toLowerCase() !== "admin") {
       return res.status(403).json({ msg: "Access denied ❌" });
     }
 
