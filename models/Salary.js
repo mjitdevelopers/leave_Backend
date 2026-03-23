@@ -56,7 +56,14 @@ const salarySchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-
+    totalWorkingHours: {
+      type: Number,
+      default: 0,
+    },
+    perHourSalary: {
+      type: Number,
+      default: 0,
+    },
     // ==========================
     // 📅 ATTENDANCE DETAILS
     // ==========================
