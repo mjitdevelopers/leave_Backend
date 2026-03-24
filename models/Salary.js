@@ -129,6 +129,12 @@ const salarySchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // 🔔 NEW FIELD (ADD THIS)
+    seen: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

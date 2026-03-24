@@ -14,4 +14,5 @@ router.get("/admin/all", verifyToken, controller.getAllAttendance);
 router.get("/admin/date", verifyToken, controller.getAttendanceByDate);
 router.get("/admin/employee", verifyToken, controller.getEmployeeAttendance);
 router.get("/today", verifyToken, controller.getTodayAttendance);
+router.get("/my", verifyToken, controller.getMyAttendance);
 module.exports = router;

@@ -15,7 +15,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 // ✅ ADD THIS LINE
 const salaryRoutes = require("./routes/salaryRoutes");
 
-dotenv.config();
+dotenv.config({ path: "./.env" });
 // 🔴 GLOBAL ERROR HANDLER ADD HERE
 process.on("uncaughtException", (err) => {
   console.log("UNCAUGHT EXCEPTION:", err);
@@ -26,7 +26,7 @@ process.on("unhandledRejection", (err) => {
 });
 connectDB();
 const app = express();
-
+require("./cronJobs");
 app.use(
   cors({
     origin: "*",

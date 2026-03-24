@@ -22,26 +22,38 @@ exports.checkIn = async (req, res) => {
     const now = getISTTime();
     const date = now.format("YYYY-MM-DD");
 
-    const existing = await Attendance.findOne({
+    let attendance = await Attendance.findOne({
       user: req.user.id,
       date,
     });
 
-    if (existing) {
+    // ✅ Present / Late only first time
+    let status = "Present";
+    if (!attendance) {
+      status =
+        now.hour() < 10 || (now.hour() === 10 && now.minute() <= 30)
+          ? "Present"
+          : "Late";
+
+      attendance = new Attendance({
+        user: req.user.id,
+        date,
+        status,
+        sessions: [],
+        totalWorkingHours: 0,
+        totalBreakHours: 0,
+      });
+    }
+
+    // ❌ Prevent double check-in
+    const lastSession = attendance.sessions[attendance.sessions.length - 1];
+    if (lastSession && !lastSession.checkOut) {
       return res.status(400).json({ msg: "Already checked-in ❌" });
     }
 
-    // ✅ Present / Late logic
-    const status =
-      now.hour() < 10 || (now.hour() === 10 && now.minute() <= 30)
-        ? "Present"
-        : "Late";
-
-    const attendance = new Attendance({
-      user: req.user.id,
-      date,
+    // ✅ Add new session
+    attendance.sessions.push({
       checkIn: now.format("HH:mm:ss"),
-      status,
     });
 
     await attendance.save();
@@ -62,22 +74,43 @@ exports.checkOut = async (req, res) => {
       date,
     });
 
-    if (!attendance) {
+    if (!attendance || attendance.sessions.length === 0) {
       return res.status(400).json({ msg: "No check-in found ❌" });
     }
 
-    if (attendance.checkOut) {
+    const lastSession = attendance.sessions[attendance.sessions.length - 1];
+
+    if (lastSession.checkOut) {
       return res.status(400).json({ msg: "Already checked-out ❌" });
     }
 
-    attendance.checkOut = now.format("HH:mm:ss");
+    // ✅ Set checkout
+    lastSession.checkOut = now.format("HH:mm:ss");
 
-    // ✅ Working hours
-    const checkIn = moment(attendance.checkIn, "HH:mm:ss");
-    const checkOut = moment(attendance.checkOut, "HH:mm:ss");
+    // ✅ Session working hours
+    const checkIn = moment(lastSession.checkIn, "HH:mm:ss");
+    const checkOut = moment(lastSession.checkOut, "HH:mm:ss");
 
     const diff = moment.duration(checkOut.diff(checkIn));
-    attendance.workingHours = Number(diff.asHours().toFixed(2));
+    lastSession.workingHours = Number(diff.asHours().toFixed(2));
+
+    // 🔥 TOTAL WORKING HOURS
+    let totalWorking = 0;
+    attendance.sessions.forEach((s) => {
+      if (s.workingHours) totalWorking += s.workingHours;
+    });
+    attendance.totalWorkingHours = Number(totalWorking.toFixed(2));
+
+    // 🔥 BREAK TIME CALCULATION
+    let breakTime = 0;
+    for (let i = 1; i < attendance.sessions.length; i++) {
+      const prevOut = moment(attendance.sessions[i - 1].checkOut, "HH:mm:ss");
+      const currIn = moment(attendance.sessions[i].checkIn, "HH:mm:ss");
+
+      const gap = moment.duration(currIn.diff(prevOut));
+      breakTime += gap.asHours();
+    }
+    attendance.totalBreakHours = Number(breakTime.toFixed(2));
 
     await attendance.save();
 
@@ -214,6 +247,38 @@ exports.getTodayAttendance = async (req, res) => {
     }
 
     res.json(record);
+  } catch (err) {
+    res.status(500).json({ msg: err.message });
+  }
+};
+// ✅ EMPLOYEE ATTENDANCE HISTORY (NEW API)
+exports.getMyAttendance = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+
+    const days = new Date(year, month, 0).getDate();
+
+    let result = [];
+
+    for (let i = 1; i <= days; i++) {
+      const date = `${year}-${month.padStart(2, "0")}-${String(i).padStart(2, "0")}`;
+
+      const record = await Attendance.findOne({
+        user: req.user.id, // 🔥 important
+        date,
+      });
+
+      if (record) {
+        result.push(record);
+      } else {
+        result.push({
+          date,
+          status: "Absent",
+        });
+      }
+    }
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ msg: err.message });
   }

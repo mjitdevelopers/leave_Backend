@@ -266,6 +266,7 @@ exports.markSalaryPaid = async (req, res) => {
     salary.status = "PAID";
     salary.paidDate = new Date();
     salary.paymentMode = paymentMode;
+    salary.seen = false; // 🔥 ADD THIS
 
     await salary.save();
 
@@ -274,7 +275,34 @@ exports.markSalaryPaid = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// ================================
+// 👤 EMPLOYEE - MY SALARY
+// ================================
+exports.getMySalary = async (req, res) => {
+  try {
+    const salaries = await Salary.find({
+      employeeId: req.user.id, // 🔥 important
+    }).sort({ createdAt: -1 });
 
+    res.json(salaries);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// ================================
+// 🔔 MARK SALARY AS SEEN
+// ================================
+exports.markSalarySeen = async (req, res) => {
+  try {
+    await Salary.findByIdAndUpdate(req.params.salaryId, {
+      seen: true,
+    });
+
+    res.json({ message: "Seen updated" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 // ================================
 // 🧾 GET SINGLE PAYSLIP
 // ================================
