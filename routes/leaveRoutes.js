@@ -120,7 +120,6 @@ router.get("/my", async (req, res) => {
 // ================= ADMIN: ALL LEAVES (SHOW ALL + OPTIONAL DATE FILTER) =================
 router.get("/all", async (req, res) => {
   try {
-    // 🔐 Verify admin
     const user = await verifyToken(req);
     if (!user || user.role !== "ADMIN") {
       return res.status(403).json({ message: "Access Denied" });
@@ -130,8 +129,8 @@ router.get("/all", async (req, res) => {
 
     let filter = {};
 
-    // ✅ If date is provided → filter by that date
-    if (date) {
+    // ✅ OPTIONAL filter (ONLY when needed)
+    if (date && date !== "null" && date !== "") {
       const selectedDate = new Date(date);
 
       filter = {
@@ -142,7 +141,7 @@ router.get("/all", async (req, res) => {
 
     const leaves = await Leave.find(filter)
       .populate("user", "name email department")
-      .sort({ createdAt: -1 }); // newest first
+      .sort({ createdAt: -1 });
 
     res.json(leaves);
   } catch (error) {

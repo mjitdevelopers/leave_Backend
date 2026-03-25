@@ -26,14 +26,17 @@ process.on("unhandledRejection", (err) => {
 });
 connectDB();
 const app = express();
-require("./cronJobs");
 app.use(
   cors({
     origin: "*",
   }),
 );
 app.use(express.json());
-
+// ✅ ADD THIS (API LOGGING)
+app.use((req, res, next) => {
+  console.log("API HIT:", req.method, req.url);
+  next();
+});
 // Security
 app.use(helmet());
 
